@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   copilot-api:
+    container_name: copilot-api
     build: .
     ports:
       - "4141:4141"
