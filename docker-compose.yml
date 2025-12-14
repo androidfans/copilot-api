@@ -5,6 +5,10 @@ services:
     build: .
     ports:
       - "4141:4141"
-    environment:
-      - GH_TOKEN=${GH_TOKEN}
+    env_file: .env
+    volumes:
+      - copilot-data:/root/.local/share/copilot-api
     restart: unless-stopped
+
+volumes:
+  copilot-data:
