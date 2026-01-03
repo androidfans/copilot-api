@@ -1,5 +1,5 @@
 import consola from "consola"
-import { events } from "fetch-event-stream"
+import { events, type ServerSentEventMessage } from "fetch-event-stream"
 
 import { copilotHeaders, copilotBaseUrl } from "~/lib/api-config"
 import { HTTPError } from "~/lib/error"
@@ -44,6 +44,44 @@ export const createChatCompletions = async (
   }
 
   return (await response.json()) as ChatCompletionResponse
+}
+
+/**
+ * 强制使用流式模式的版本，返回类型始终是 AsyncGenerator
+ * 用于避免非流式请求的超时问题
+ */
+export const createChatCompletionsStream = async (
+  payload: Omit<ChatCompletionsPayload, "stream">,
+): Promise<AsyncGenerator<ServerSentEventMessage, void, unknown>> => {
+  if (!state.copilotToken) throw new Error("Copilot token not found")
+
+  const enableVision = payload.messages.some(
+    (x) =>
+      typeof x.content !== "string"
+      && x.content?.some((x) => x.type === "image_url"),
+  )
+
+  const isAgentCall = payload.messages.some((msg) =>
+    ["assistant", "tool"].includes(msg.role),
+  )
+
+  const headers: Record<string, string> = {
+    ...copilotHeaders(state, enableVision),
+    "X-Initiator": isAgentCall ? "agent" : "user",
+  }
+
+  const response = await fetch(`${copilotBaseUrl(state)}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...payload, stream: true }),
+  })
+
+  if (!response.ok) {
+    consola.error("Failed to create chat completions", response)
+    throw new HTTPError("Failed to create chat completions", response)
+  }
+
+  return events(response)
 }
 
 // Streaming types
