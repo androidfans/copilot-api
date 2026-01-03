@@ -66,6 +66,10 @@ export async function handleCompletion(c: Context) {
     })
   }
 
+  consola.info(
+    "Client requested non-streaming response; using upstream streaming and collecting chunks",
+  )
+
   // 客户端请求非流式响应，收集流式数据块并合并
   consola.debug("Collecting stream chunks for non-streaming response")
   const nonStreamResponse = await collectStreamToResponse(response)
