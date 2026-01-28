@@ -1,9 +1,13 @@
 #!/bin/sh
-if [ "$1" = "--auth" ]; then
-  # Run auth command
-  exec bun run dist/main.js auth
-else
-  # Default command
-  exec bun run dist/main.js start -g "$GH_TOKEN" "$@"
-fi
+case "$1" in
+  --auth)
+    exec bun run dist/main.js auth
+    ;;
+  refresh-token)
+    exec bun run dist/main.js refresh-token
+    ;;
+  *)
+    exec bun run dist/main.js start -g "$GH_TOKEN" "$@"
+    ;;
+esac
 

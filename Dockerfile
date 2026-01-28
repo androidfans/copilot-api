@@ -21,5 +21,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --spider -q http://localhost:4141/ || exit 1
 
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY refresh-token /usr/local/bin/refresh-token
+RUN chmod +x /entrypoint.sh /usr/local/bin/refresh-token
+
 ENTRYPOINT ["/entrypoint.sh"]
