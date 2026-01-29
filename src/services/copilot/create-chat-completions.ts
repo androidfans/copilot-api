@@ -4,10 +4,12 @@ import { events, type ServerSentEventMessage } from "fetch-event-stream"
 import { copilotHeaders, copilotBaseUrl } from "~/lib/api-config"
 import { HTTPError } from "~/lib/error"
 import { state } from "~/lib/state"
+import { refreshCopilotTokenOnError } from "~/lib/token"
 
-export const createChatCompletions = async (
+async function doFetch(
   payload: ChatCompletionsPayload,
-) => {
+  streamOverride?: boolean,
+) {
   if (!state.copilotToken) throw new Error("Copilot token not found")
 
   const enableVision = payload.messages.some(
@@ -16,23 +18,39 @@ export const createChatCompletions = async (
       && x.content?.some((x) => x.type === "image_url"),
   )
 
-  // Agent/user check for X-Initiator header
-  // Determine if any message is from an agent ("assistant" or "tool")
   const isAgentCall = payload.messages.some((msg) =>
     ["assistant", "tool"].includes(msg.role),
   )
 
-  // Build headers and add X-Initiator
   const headers: Record<string, string> = {
     ...copilotHeaders(state, enableVision),
     "X-Initiator": isAgentCall ? "agent" : "user",
   }
 
-  const response = await fetch(`${copilotBaseUrl(state)}/chat/completions`, {
+  const body =
+    streamOverride !== undefined ?
+      { ...payload, stream: streamOverride }
+    : payload
+
+  return fetch(`${copilotBaseUrl(state)}/chat/completions`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   })
+}
+
+export const createChatCompletions = async (
+  payload: ChatCompletionsPayload,
+) => {
+  let response = await doFetch(payload)
+
+  if (response.status === 401) {
+    consola.warn("Got 401, attempting token refresh")
+    const refreshed = await refreshCopilotTokenOnError()
+    if (refreshed) {
+      response = await doFetch(payload)
+    }
+  }
 
   if (!response.ok) {
     consola.error("Failed to create chat completions", response)
@@ -53,28 +71,15 @@ export const createChatCompletions = async (
 export const createChatCompletionsStream = async (
   payload: Omit<ChatCompletionsPayload, "stream">,
 ): Promise<AsyncGenerator<ServerSentEventMessage, void, unknown>> => {
-  if (!state.copilotToken) throw new Error("Copilot token not found")
+  let response = await doFetch(payload as ChatCompletionsPayload, true)
 
-  const enableVision = payload.messages.some(
-    (x) =>
-      typeof x.content !== "string"
-      && x.content?.some((x) => x.type === "image_url"),
-  )
-
-  const isAgentCall = payload.messages.some((msg) =>
-    ["assistant", "tool"].includes(msg.role),
-  )
-
-  const headers: Record<string, string> = {
-    ...copilotHeaders(state, enableVision),
-    "X-Initiator": isAgentCall ? "agent" : "user",
+  if (response.status === 401) {
+    consola.warn("Got 401, attempting token refresh")
+    const refreshed = await refreshCopilotTokenOnError()
+    if (refreshed) {
+      response = await doFetch(payload as ChatCompletionsPayload, true)
+    }
   }
-
-  const response = await fetch(`${copilotBaseUrl(state)}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ ...payload, stream: true }),
-  })
 
   if (!response.ok) {
     consola.error("Failed to create chat completions", response)

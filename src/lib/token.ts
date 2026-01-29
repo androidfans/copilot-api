@@ -12,6 +12,35 @@ import { state } from "./state"
 
 const readGithubToken = () => fs.readFile(PATHS.GITHUB_TOKEN_PATH, "utf8")
 
+const REFRESH_COOLDOWN_MS = 60 * 60 * 1000 // 1 hour
+let lastRefreshAttempt = 0
+
+export async function refreshCopilotTokenOnError(): Promise<boolean> {
+  const now = Date.now()
+  if (now - lastRefreshAttempt < REFRESH_COOLDOWN_MS) {
+    consola.warn(
+      "Token refresh on error skipped: cooldown not elapsed (1 hour limit)",
+    )
+    return false
+  }
+
+  lastRefreshAttempt = now
+  consola.info("Attempting to refresh Copilot token due to request error")
+
+  try {
+    const { token } = await getCopilotToken()
+    state.copilotToken = token
+    consola.info("Copilot token refreshed successfully after error")
+    if (state.showToken) {
+      consola.info("Refreshed Copilot token:", token)
+    }
+    return true
+  } catch (error) {
+    consola.error("Failed to refresh Copilot token on error:", error)
+    return false
+  }
+}
+
 const writeGithubToken = (token: string) =>
   fs.writeFile(PATHS.GITHUB_TOKEN_PATH, token)
 
