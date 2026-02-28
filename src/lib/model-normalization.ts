@@ -2,6 +2,7 @@ const modelAliases: Record<string, string> = {
   "claude-opus-4-6[1M]": "claude-opus-4.6-1m",
   "claude-opus-4-6": "claude-opus-4.6-1m",
   "claude-sonnet-4-6": "claude-sonnet-4.6",
+  "claude-haiku-4-5": "claude-haiku-4.5",
 }
 
 const reverseModelAliases = new Map<string, Array<string>>()
