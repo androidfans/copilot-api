@@ -1,3 +1,7 @@
+// When configuring claude-opus-4-6[1M] in Claude Code, the [1M] suffix only
+// activates the client-side 1M context window. The actual model name sent in
+// requests is still claude-opus-4-6. So to enable 1M context support, we must
+// map claude-opus-4-6 to claude-opus-4.6-1m (not claude-opus-4.6).
 const modelAliases: Record<string, string> = {
   "claude-opus-4-6[1M]": "claude-opus-4.6-1m",
   "claude-opus-4-6": "claude-opus-4.6-1m",
