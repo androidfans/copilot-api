@@ -3,6 +3,7 @@ import { events, type ServerSentEventMessage } from "fetch-event-stream"
 
 import { copilotHeaders, copilotBaseUrl } from "~/lib/api-config"
 import { HTTPError } from "~/lib/error"
+import { normalizeModelName } from "~/lib/model-normalization"
 import { state } from "~/lib/state"
 import { refreshCopilotTokenOnError } from "~/lib/token"
 
@@ -12,13 +13,18 @@ async function doFetch(
 ) {
   if (!state.copilotToken) throw new Error("Copilot token not found")
 
-  const enableVision = payload.messages.some(
+  const normalizedPayload: ChatCompletionsPayload = {
+    ...payload,
+    model: normalizeModelName(payload.model),
+  }
+
+  const enableVision = normalizedPayload.messages.some(
     (x) =>
       typeof x.content !== "string"
       && x.content?.some((x) => x.type === "image_url"),
   )
 
-  const isAgentCall = payload.messages.some((msg) =>
+  const isAgentCall = normalizedPayload.messages.some((msg) =>
     ["assistant", "tool"].includes(msg.role),
   )
 
@@ -29,8 +35,8 @@ async function doFetch(
 
   const body =
     streamOverride !== undefined ?
-      { ...payload, stream: streamOverride }
-    : payload
+      { ...normalizedPayload, stream: streamOverride }
+    : normalizedPayload
 
   return fetch(`${copilotBaseUrl(state)}/chat/completions`, {
     method: "POST",
